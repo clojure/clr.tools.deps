@@ -15,7 +15,7 @@ Latest release: 0.1.1
 deps.edn dependency information:
 
 ```clojure
- io.github.dmiller/deps-cljr-test1 {:git/tag "v0.1.1" :git/sha "cc30a2d"}
+ io.github.clojure/clr.tools.deps {:git/tag "v0.1.1" :git/sha "cc30a2d"}
 ```
 
 ## Copyright and License
