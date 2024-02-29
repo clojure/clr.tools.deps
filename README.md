@@ -8,14 +8,15 @@ Please see the parent repo for documentation.
 
 ## Releases
 
-Definitely in an alpha situation.
+Definitely in an alpha situation.  Under active development.
 
 Latest release: 0.1.1
 
 deps.edn dependency information:
 
- io.github.dmiller/deps-cljr-test1 {:git/tag "v0.1.1" :git/sha "TBD"}}
-
+```clojure
+ io.github.dmiller/deps-cljr-test1 {:git/tag "v0.1.1" :git/sha "cc30a2d"}
+```
 
 ## Copyright and License
 
