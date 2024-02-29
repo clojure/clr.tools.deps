@@ -72,7 +72,7 @@
                               #'pp/*print-miser-width* 80
                               #'*print-namespace-maps* false}
                 (pp/pprint resolved-map)))
-                #?@(:cljr (:file-mode System.IO.FileMode/Truncate))))))
+                #?@(:cljr (:file-mode System.IO.FileMode/Create))))))
     (catch #?(:clj Throwable :cljr Exception) t
       (printerrln "Error resolving tags." (#?(:clj .getMessage :cljr .Message) t))
       (when-not (instance? IExceptionInfo t)

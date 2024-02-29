@@ -168,7 +168,7 @@
     (when trace
       (spit "trace.edn" 
             (binding [*print-namespace-maps* false] (with-out-str (pprint/pprint trace-log)))
-             #?@(:cljr (:file-mode System.IO.FileMode/Truncate))))
+             #?@(:cljr (:file-mode System.IO.FileMode/Create))))
     (when tree
       (-> trace-log tree/trace->tree (tree/print-tree nil)))
     (when-not skip-cp

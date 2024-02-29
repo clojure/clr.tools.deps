@@ -77,7 +77,7 @@
         (catch Exception e
           (let [parent-name (.Name parent)]
             (throw (ex-info (str "Can't create directory: " parent-name ", " (.Message e)) {:dir parent-name}))))))
-    (spit the-file s :file-mode System.IO.FileMode/Truncate)))
+    (spit the-file s :file-mode System.IO.FileMode/Create)))
 )
 
 
