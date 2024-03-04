@@ -171,6 +171,9 @@
                          :else (str home directory-separator ".clojure"))]
     (str config-dir directory-separator "deps.edn")))
 
+#?(
+:clj
+
 (defn find-edn-maps
   "Finds and returns standard deps edn maps in a map with keys
     :root-edn, :user-edn, :project-edn
@@ -178,11 +181,32 @@
   ([]
    (find-edn-maps nil))
   ([project-edn-file]
-   (let [user-loc (#?(:clj jio/file :cljr cio/file-info) (user-deps-path))
-         project-loc (#?(:clj jio/file :cljr cio/file-info) (if project-edn-file project-edn-file (str dir/*the-dir* directory-separator "deps.edn")))]
+   (let [user-loc (jio/file (user-deps-path))
+         project-loc (jio/file (if project-edn-file project-edn-file (str dir/*the-dir* directory-separator "deps.edn")))]
      (cond-> {:root-edn (root-deps)}
-       (#?(:clj .exists :cljr .Exists) user-loc) (assoc :user-edn (slurp-deps user-loc))
-       (#?(:clj .exists :cljr .Exists) project-loc) (assoc :project-edn (slurp-deps project-loc))))))
+       (.exists user-loc) (assoc :user-edn (slurp-deps user-loc))
+       (.exists project-loc) (assoc :project-edn (slurp-deps project-loc))))))
+	   
+:cljr
+
+(defn find-edn-maps
+  "Finds and returns standard deps edn maps in a map with keys
+    :root-edn, :user-edn, :project-edn
+  If no project-edn is supplied, use the deps.edn in current directory"
+  ([]
+   (find-edn-maps nil))
+  ([project-edn-file]
+   (let [user-loc (cio/file-info (user-deps-path))
+         f1-loc (cio/file-info (str dir/*the-dir* directory-separator "deps-clr.edn"))
+         project-loc 
+		   (cond  project-edn-file (cio/file-info project-edn-file) 
+		         (.Exists f1-loc) f1-loc 
+				 :else (cio/file-info (str dir/*the-dir* directory-separator "deps.edn")))]
+     (cond-> {:root-edn (root-deps)}
+       (.Exists user-loc) (assoc :user-edn (slurp-deps user-loc))
+       (.Exists project-loc) (assoc :project-edn (slurp-deps project-loc))))))
+	   
+)
 
 (defn- merge-or-replace
   "If maps, merge, otherwise replace"
@@ -939,6 +963,9 @@
     :else (throw (ex-info (format "Unexpected dep source: %s" (pr-str requested))
                    {:requested requested}))))
 
+#?(
+:clj
+
 (defn create-edn-maps
   "Create a set of edn maps from the standard dep sources and return
    them in a map with keys :root :user :project :extra"
@@ -946,14 +973,38 @@
     :or {root :standard, user :standard, project :standard}}]
   (let [root-edn (choose-deps root #(root-deps))
         user-edn (choose-deps user #(-> (user-deps-path) #?(:clj jio/file :cljr identity)  dir/canonicalize slurp-deps))
-        project-edn (choose-deps project #(-> "deps.edn" #?(:clj jio/file :cljr identity)  dir/canonicalize slurp-deps))
+        project-edn (choose-deps project #(or (-> "deps-clr.edn" #?(:clj jio/file :cljr identity)  dir/canonicalize slurp-deps)
+                                              (-> "deps.edn"     #?(:clj jio/file :cljr identity)  dir/canonicalize slurp-deps)))
         extra-edn (choose-deps extra (constantly nil))]
     (cond-> {}
       root-edn (assoc :root root-edn)
       user-edn (assoc :user user-edn)
       project-edn (assoc :project project-edn)
       extra-edn (assoc :extra extra-edn))))
-	  
+
+:cljr
+
+(defn create-edn-maps
+  "Create a set of edn maps from the standard dep sources and return
+   them in a map with keys :root :user :project :extra"
+  [{:keys [root user project extra] :as params
+    :or {root :standard, user :standard, project :standard}}]
+  (let [root-edn (choose-deps root #(root-deps))
+        user-edn (choose-deps user #(-> (user-deps-path) #?(:clj jio/file :cljr identity)  dir/canonicalize slurp-deps))
+        project-edn (choose-deps project #(or 
+											(-> "deps-clr.edn" #?(:clj jio/file :cljr identity)  dir/canonicalize slurp-deps)	
+											(-> "deps.edn" #?(:clj jio/file :cljr identity)  dir/canonicalize slurp-deps)))
+        extra-edn (choose-deps extra (constantly nil))]
+    (cond-> {}
+      root-edn (assoc :root root-edn)
+      user-edn (assoc :user user-edn)
+      project-edn (assoc :project project-edn)
+      extra-edn (assoc :extra extra-edn))))
+
+	
+)
+
+	
 #?(
 :clj	  
 (defmacro ^:private in-project-dir
