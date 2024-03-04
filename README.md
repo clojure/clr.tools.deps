@@ -10,12 +10,12 @@ Please see the parent repo for documentation.
 
 Definitely in an alpha situation.  Under active development.
 
-Latest release: 0.1.1
+Latest release: 0.1.2
 
 deps.edn dependency information:
 
 ```clojure
- io.github.clojure/clr.tools.deps {:git/tag "v0.1.1" :git/sha "cc30a27"}
+ io.github.clojure/clr.tools.deps {:git/tag "v0.1.2" :git/sha "49c3039"}
 ```
 
 ## Copyright and License
