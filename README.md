@@ -13,7 +13,7 @@ Definitely in an alpha situation.  Under active development.
 Latest release: 0.1.3
 
 deps.edn dependency information:
-
+q
 ```clojure
  io.github.clojure/clr.tools.deps {:git/tag "v0.1.3" :git/sha "a98c596"}
 ```
