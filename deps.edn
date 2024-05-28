@@ -1,9 +1,13 @@
 {:paths ["src/main/clojure"]
  :deps {
-   io.github.clojure/clr.tools.gitlibs {:git/tag "v2.5.197" :git/sha "a45c55f"}
+   io.github.clojure/clr.tools.gitlibs {:git/tag "v2.5.198" :git/sha "3d561c2"}
    io.github.clojure/tools.cli {:git/tag "v1.1.230" :git/sha "717e187"}
  }
- :aliases {
-   :test {:extra-paths ["src/test/clojure"]}
+   :aliases
+   {:test
+     {:extra-paths ["src/test/clojure"]
+	  :extra-deps {io.github.dmiller/test-runner {:git/tag "v0.5.1clr" :git/sha "814e06f"}}
+	  ;; :main-opts {"-m" "cognitect.test-runner" "-d" "src/test/clojure"}
+	  :exec-fn cognitect.test-runner.api/test
+	  :exec-args {:dirs ["src/test/clojure"]}}}
  }
-}
