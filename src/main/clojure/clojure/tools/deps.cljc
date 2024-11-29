@@ -667,7 +667,7 @@
 (defn- make-tree
   [lib-map]
   (let [{roots false, nonroots true} (group-by #(-> % val :dependents boolean) lib-map)]
-    (loop [q (into (PersistentQueue/EMPTY) roots)
+    (loop [q (into PersistentQueue/EMPTY roots)
            remaining nonroots
            tree {}]
       (let [[lib coord :as node] (peek q)
