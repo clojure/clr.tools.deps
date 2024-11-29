@@ -8,14 +8,14 @@ Please see the parent repo for documentation.
 
 ## Releases
 
-Definitely in an alpha situation.  Under active development.
 
-Latest release: 0.1.4
+
+Latest release: 0.1.5
 
 deps.edn dependency information:
 
 ```clojure
- io.github.clojure/clr.tools.deps {:git/tag "v0.1.4" :git/sha "4a99486"}
+ io.github.clojure/clr.tools.deps {:git/tag "v0.1.5" :git/sha "b49ac06"}
 ```
 
 ## Copyright and License
