@@ -489,7 +489,7 @@
              :ppath use-path
              :child-pred child-pred})]
     (loop [pendq nil ;; a resolved child-lookup thunk to look at first
-           q (into (PersistentQueue/EMPTY) (map vector deps)) ;; queue of nodes or child-lookups
+           q (into PersistentQueue/EMPTY (map vector deps)) ;; queue of nodes or child-lookups
            version-map nil ;; track all seen versions of libs and which version is selected
            exclusions nil ;; tracks exclusions marked in the tree
            cut nil ;; tracks cuts made of child nodes based on exclusions
@@ -536,7 +536,7 @@
                  :ppath use-path
                  :child-pred child-pred})]
         (loop [pendq nil ;; a resolved child-lookup thunk to look at first
-               q (into (PersistentQueue/EMPTY) (map vector deps)) ;; queue of nodes or child-lookups
+               q (into PersistentQueue/EMPTY (map vector deps)) ;; queue of nodes or child-lookups
                version-map {} ;; track all seen versions of libs and which version is selected
                exclusions nil ;; tracks exclusions marked in the tree
                cut nil ;; tracks cuts made of child nodes based on exclusions
