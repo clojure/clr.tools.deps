@@ -24,11 +24,17 @@
     [clojure.lang PersistentQueue]
     #?(:clj [java.io File InputStreamReader BufferedReader]
 	   :cljr [System.IO  Path FileInfo DirectoryInfo])
-    #?(:clj [java.lang ProcessBuilder ProcessBuilder$Redirect] :cljr [System.Diagnostics ProcessStartInfo Process])
+    #?(:clj [java.lang ProcessBuilder ProcessBuilder$Redirect] )   ;;; :cljr [System.Diagnostics ProcessStartInfo Process]  -- defer until after we load the dll, if required.
     #?(:clj [java.util List] 
 	   :cljr [System.Collections ArrayList])
 	#?(:cljr [System.Threading CancellationTokenSource CancellationToken])   
 	   ))
+
+(try 
+  (assembly-load-from (str clojure.lang.RT/SystemRuntimeDirectory "System.Diagnostics.Process.dll"))
+  (catch Exception e))  ;; failing silently okay -- if we need it and didn't find it, a type reference will fail later
+
+(import '[System.Diagnostics Process ProcessStartInfo])
 
 (set! *warn-on-reflection* true)
 
