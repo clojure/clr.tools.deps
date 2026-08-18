@@ -160,7 +160,7 @@
   Options:
     --config-user=path - user deps.edn file (usually ~/.clojure/deps.edn)
     --config-project=path - project deps.edn file (usually ./deps.edn)
-    --config-data={...} - deps.edn as data (from -Sdeps)
+    --config-data={...} - deps.edn as data, or file name (from -Sdeps)
     --tool-mode - flag for tool mode
     --tool-name - name of tool to run
     --cp-file=path - cp cache file to write

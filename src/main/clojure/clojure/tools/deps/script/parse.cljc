@@ -50,4 +50,7 @@
   "Parses a string of edn into a deps map."
   [s]
   (#'deps/canonicalize-all-syms  ;; to be removed in the future
-    (edn/read-string {:default tagged-literal} s)))
+    (cond
+      (str/blank? s) (throw (ex-info (str "-Sdeps must be non-blank") {}))
+      (str/starts-with? (str/trim s) "{") (edn/read-string {:default tagged-literal} s)
+      :else s)))

@@ -2,7 +2,9 @@
   (:require
     [clojure.test :refer [deftest is]]
     [clojure.tools.deps.script.make-classpath2 :as mc]
-    #?(:clj [clojure.java.io :as jio] :cljr [clojure.clr.io :as cio])))
+    #?(:clj [clojure.java.io :as jio] :cljr [clojure.clr.io :as cio]))
+  (:import
+    #?(:clj [java.io File] :cljr [System.IO File Path])))
 
 (defn submap?
   "Is m1 a subset of m2?"
@@ -251,6 +253,19 @@
                     (map #(.getCanonicalPath (jio/file %)) paths)))
 	   :cljr (is (= (map #(.FullName (cio/dir-info %)) ["." "x" "y"])                                ;;; return from dir-info can't be compared 
                     (map #(.FullName (cio/dir-info %)) paths))))))
+
+#_(deftest config-data                                                                                              ;;; CLR can't deal with :mvn coords
+  (let [{:keys [basis]} (mc/run-core {:config-project {:deps {'org.clojure/clojure {:mvn/version "1.12.0"}}}
+                                      :config-data {:deps {'org.clojure/data.json {:mvn/version "2.5.0"}}}})]
+    (is (contains? (:libs basis) 'org.clojure/data.json))))
+
+#_(deftest config-data-file                                                                                           ;;; CLR can't deal with :mvn coords
+  (let [temp-file #?(:clj (File/createTempFile "deps" ".edn") :cljr (File/Create (Path/ChangeExtension (.ToString (Guid/NewGuid)) ".edn")))
+        _ (spit temp-file "{:deps {org.clojure/data.json {:mvn/version \"2.5.0\"}}}")
+        {:keys [basis]} (mc/run-core {:config-project {:deps {'org.clojure/clojure {:mvn/version "1.12.0"}}}
+                                      :config-data #?(:clj (.getAbsolutePath temp-file) :cljr (.Name temp-file))})]
+    (is (contains? (:libs basis) 'org.clojure/data.json))))
+
 
 (comment
   (clojure.test/run-tests)
