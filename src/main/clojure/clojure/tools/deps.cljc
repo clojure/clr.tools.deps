@@ -321,7 +321,8 @@
             enq-only (set/difference cut-coord new-cut)]
         {:exclusions' exclusions'
          :cut' (assoc cut [lib coord-id] new-cut)
-         :child-pred (fn [lib] (not (contains? new-cut lib)))})
+         :child-pred (set enq-only)})
+         ;:child-pred (fn [lib] (not (contains? new-cut lib)))})
 
       :else ;; otherwise, no change
       {:exclusions' exclusions, :cut' cut})))
