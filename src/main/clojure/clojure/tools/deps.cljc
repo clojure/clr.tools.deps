@@ -368,16 +368,21 @@
   "Is any part of the parent path missing from the selected lib/versions?
   This can happen if a newer version was found, orphaning previously selected children."
   [vmap parent-path]
-  (when (seq parent-path)
-    (loop [path parent-path]
-      (if (seq path)
-        (let [lib (last path)
-              check-path (vec (butlast path))
-              {:keys [paths select]} (get vmap lib)]
-          (if (contains? (get paths select) check-path)
-            (recur check-path)
-            true))
-        false))))
+  (loop [path parent-path
+         more-paths nil]
+    (if (seq path)
+      (let [lib (last path)
+            check-path (vec (butlast path))
+            {:keys [paths select]} (get vmap lib)]
+        (let [paths-to-selected (get paths select)]
+          (if (contains? paths-to-selected check-path)
+            ;; add alternative paths to root that include the selected lib
+            (recur check-path (concat more-paths (remove #(= % check-path) paths-to-selected)))
+            (if (seq more-paths)
+              ;; consider alternative paths before considering lib to be omitted
+              (recur (first more-paths) (rest more-paths))
+              true))))
+      false)))
 
 (defn- deselect-orphans
   "For the given paths, deselect any libs whose only selected version paths are in omitted-paths"
