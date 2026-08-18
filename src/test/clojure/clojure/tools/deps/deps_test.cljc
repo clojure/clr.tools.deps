@@ -237,6 +237,25 @@
           (let [res (deps/resolve-deps {:deps {'ex/a {:fkn/version "1"}
                                                'ex/b {:fkn/version "1"}}} nil)]
             (libs->lib-ver res))))))
+			
+;; +a1 -> -h1 -> -c1 -> -d1
+;; +b1 -> +e1 -> +c1 -> +d1
+;;            -> +h2 -> c1 -> d1
+;; h2 supersedes previous h1, but need to ensure d1 is included via c1 somewhere
+(deftest test-cut-previously-selected-child-3
+  (fkn/with-libs {'ex/a {{:fkn/version "1"} [['ex/h {:fkn/version "1"}]]}
+                  'ex/b {{:fkn/version "1"} [['ex/e {:fkn/version "1"}]]}
+                  'ex/c {{:fkn/version "1"} [['ex/d {:fkn/version "1"}]]}
+                  'ex/d {{:fkn/version "1"} nil}
+                  'ex/e {{:fkn/version "1"} [['ex/c {:fkn/version "1"}] ['ex/h {:fkn/version "2"}]]}
+                  'ex/h {{:fkn/version "1"} [['ex/c {:fkn/version "1"}]]
+                         {:fkn/version "2"} [['ex/c {:fkn/version "1"}]]}}
+    (is (= {:a "1", :b "1", :c "1", :d "1", :e "1", :h "2"}
+          (let [res (deps/resolve-deps {:deps {'ex/a {:fkn/version "1"}
+                                               'ex/b {:fkn/version "1"}}} {:threads 1})]
+            (libs->lib-ver res))))))
+
+(comment (test-cut-previously-selected-child-3) )			
 
 ;; +a -> +b -> -x2 -> -y2 -> -z2
 ;;    -> +c -> +d -> +x3 -> +y2 -> +z2
@@ -514,7 +533,7 @@
         cut '{[a {:mvn/version "1"}] #{c}}
         ret (#'deps/update-excl 'a '{:mvn/version "1" :exclusions [c d]} {:mvn/version "1"} '[b a] false :same-version excl cut)]
     (is (= {:exclusions' '{[a] #{c}, [b a] #{c d}}, :cut' cut} (select-keys ret [:exclusions' :cut']))) ;; no change in cut
-    (let [pred (:child-pred ret)] ;; everything already enqueued
+    (let [pred (:child-pred ret)] ;; c excluded in both, but re-enqueue d - always intersection
       (is (false? (boolean (pred 'c))))
       (is (false? (boolean (pred 'd)))))))
 )
