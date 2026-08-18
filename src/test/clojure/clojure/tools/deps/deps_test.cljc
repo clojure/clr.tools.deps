@@ -1,4 +1,4 @@
-(ns clojure.tools.deps.test-deps
+(ns clojure.tools.deps.deps-test
   (:require
     #?(:clj [clojure.java.io :as jio]
 	   :cljr [clojure.clr.io :as cio])
@@ -324,13 +324,14 @@
     (let [base (.getCanonicalFile *test-dir*)
           adeps (.getPath (jio/file base "a/deps.edn"))
           bdeps (.getPath (jio/file base "b/deps.edn"))
+          adir (.getAbsolutePath (jio/file base "a"))
           bdir (.getAbsolutePath (jio/file base "b"))]
       (jio/make-parents *test-dir* "a/deps.edn")
       (jio/make-parents *test-dir* "b/deps.edn")
       (spit adeps "{:deps {b/b {:local/root \"../b\"}}}")
       (spit bdeps "{:paths [\"src\"]}")
-      (let [b (deps/create-basis {:user nil :project adeps})]
-        (is (contains? (:classpath b) (.getAbsolutePath (jio/file bdir "src"))))))))
+      (let [abasis (deps/create-basis {:user nil :dir adir})]
+        (is (contains? (:classpath abasis) (.getAbsolutePath (jio/file bdir "src"))))))))
 		
 ;; TODO -- translate this for CLJR someday
 
@@ -591,6 +592,14 @@
        :classpath-roots ["p" "override.jar" "REPO/ex/b/1/b-1.jar"]  ;; ditto above
        :basis-config {:root nil, :user nil, :aliases [:a1 :a2]} ;; aliases remembered
        })))
+
+(deftest test-project-deps-doesnt-exist
+  (is (= "BOGUS.edn" (-> (deps/create-basis {:user nil :project "BOGUS.edn"})
+                       :basis-config :project)))
+  (is (= "BOGUS.edn" (-> (deps/create-basis {:user nil :dir "foo" :project "BOGUS.edn"})
+                           :basis-config :project)))
+  (is (= "foo/BOGUS.edn" (-> (deps/create-basis {:user nil :project "foo/BOGUS.edn"})
+                       :basis-config :project))))
 
 #?(
 :clj
