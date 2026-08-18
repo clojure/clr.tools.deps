@@ -921,7 +921,8 @@
                      (dir/with-dir root-dir
                        (let [basis (create-basis
                                     {:project :standard ;; deps.edn at root
-                                     :args {:replace-deps {} :replace-paths ["."]}})
+                                     :args {:replace-deps {} :replace-paths ["."]}
+                                     :aliases [alias]})
                              cp (join-classpath (:classpath-roots basis))
                              qual-f (qualify-fn f (get-in basis [:aliases alias]))
                              exit (exec-prep! root-dir cp qual-f exec-args)]
