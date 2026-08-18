@@ -5,4 +5,5 @@
 
 (deftest test-parse-config
   (is (= {:paths ["x"]} (parse/parse-config "{:paths [\"x\"]}")))
-  (is (= "foo/deps.edn" (parse/parse-config "foo/deps.edn"))))
+  (is (= "deps.edn" (parse/parse-config "deps.edn")))
+  (is (thrown? clojure.lang.ExceptionInfo (parse/parse-config "BOGUS"))))
