@@ -12,7 +12,6 @@
     #?(:clj [clojure.java.io :as jio]
 	   :cljr [clojure.clr.io :as cio])
     [clojure.pprint :as pprint]
-    [clojure.string :as str]
     [clojure.tools.cli :as cli]
     [clojure.tools.deps :as deps]
     [clojure.tools.deps.extensions :as ext]
@@ -23,9 +22,12 @@
   (:import
     [clojure.lang IExceptionInfo]))
 
+(defn blank-to-nil [s]
+  (if (zero? (count s)) nil s))
+
 (def ^:private opts
   [;; deps.edn inputs
-   [nil "--config-user PATH" "User deps.edn location"]
+   [nil "--config-user PATH" "User deps.edn location" :parse-fn blank-to-nil]
    [nil "--config-project PATH" "Project deps.edn location"]
    [nil "--config-data EDN" "Final deps.edn data to treat as the last deps.edn file" :parse-fn parse/parse-config]
    #?(:cljr [nil "--install-dir PATH" "Installation directory (CLJR only), internal use"] )
@@ -63,9 +65,10 @@
 (defn resolve-tool-args
   "Resolves the tool by name to the coord + usage data.
    Returns the proper alias args as if the tool was specified as an alias."
-  [tool-name config]
+  [tool-name]
   (if-let [{:keys [lib coord]} (tool/resolve-tool tool-name)]
-    (let [manifest-type (ext/manifest-type lib coord config)
+    (let [config nil ;; for now, tools are only git or local which have none
+          manifest-type (ext/manifest-type lib coord config)
           coord' (merge coord manifest-type)
           {:keys [ns-default ns-aliases]} (ext/coord-usage lib coord' (:deps/manifest coord') config)]
       {:replace-deps {lib coord'}
@@ -75,49 +78,33 @@
     (throw (ex-info (str "Unknown tool: " tool-name) {:tool tool-name}))))
 
 (defn run-core
-  "Run make-classpath script from/to data (no file stuff). Returns:
-    {;; Outputs:
+  "Run make-classpath script from/to data. Returns map w/keys:
      :basis        ;; the basis, including classpath roots
      :trace        ;; if requested, trace.edn file
-     :manifests    ;; manifest files used in making classpath
-    }"
-  [{:keys [install-deps user-deps project-deps config-data ;; all deps.edn maps
-           tool-mode tool-name tool-resolver ;; -T options
+     :manifests    ;; manifest files used in making classpath"
+  [{:keys [config-user config-project config-data tool-data
            main-aliases exec-aliases repl-aliases tool-aliases
            skip-cp threads trace tree] :as _opts}]
   (when (and main-aliases exec-aliases)
     (throw (ex-info "-M and -X cannot be used at the same time" {})))
-  (let [pretool-edn (deps/merge-edns [install-deps user-deps project-deps config-data])
-        ;; tool use - :deps/:paths/:replace-deps/:replace-paths in project if needed
-        tool-args (cond
-                    tool-name (tool-resolver tool-name pretool-edn)
-                    tool-mode {:replace-deps {} :replace-paths ["."]})
-        tool-edn (when tool-args {:aliases {:deps/TOOL tool-args}})
-        ;; :deps/TOOL is a synthetic deps.edn combining the tool definition and usage
-        ;; it is injected at the end of the deps chain and added as a pseudo alias
-        ;; the effects are seen in the basis but this pseduo alias should not escape
-        combined-tool-args (deps/combine-aliases
-                            (deps/merge-edns [pretool-edn tool-edn])
-                            (concat main-aliases exec-aliases repl-aliases tool-aliases (when tool-edn [:deps/TOOL])))
-        project-deps (deps/tool project-deps combined-tool-args)
+  (let [combined-exec-aliases (concat main-aliases exec-aliases repl-aliases tool-aliases)
+        args (cond-> nil
+               threads (assoc :threads (#?(:clj Long/parseLong :cljr Int64/Parse) threads))
+               trace (assoc :trace trace)
+               tree (assoc :trace true)
+               skip-cp (assoc :skip-cp true)
+               (or tool-data tool-aliases) (assoc :replace-paths ["."] :replace-deps {})
+               tool-data (merge tool-data))
+        basis (deps/create-basis
+                {:user config-user
+                 :project config-project
+                 :extra config-data
+                 :aliases combined-exec-aliases
+                 :args args})
 
-        ;; calc basis
-        merge-edn (deps/merge-edns [install-deps user-deps project-deps config-data (when tool-edn tool-edn)]) ;; recalc to get updated project-deps
-        combined-exec-aliases (concat main-aliases exec-aliases repl-aliases tool-aliases (when tool-edn [:deps/TOOL]))
-        _ (check-aliases merge-edn combined-exec-aliases)
-        argmap (deps/combine-aliases merge-edn combined-exec-aliases)
-        resolve-args (cond-> argmap
-                       threads (assoc :threads (#?(:clj Long/parseLong :cljr Int64/Parse) threads))
-                       trace (assoc :trace trace)
-                       tree (assoc :trace true))
-        basis (cond-> nil
-               (not skip-cp) (merge
-                              (deps/calc-basis merge-edn {:resolve-args resolve-args, :classpath-args argmap})
-                              {:basis-config (cond-> {} ;; :root and :project are always :standard
-                                               (nil? user-deps) (assoc :user nil) ;; -Srepro => :user nil
-                                               config-data (assoc :extra config-data)  ;; -Sdeps => :extra ...
-                                               (seq combined-exec-aliases) (assoc :aliases (vec combined-exec-aliases)))})
-                (pos? (count argmap)) (assoc :argmap argmap))
+        ;; check for unused aliases and warn
+        _ (check-aliases basis combined-exec-aliases)
+
         libs (:libs basis)
         trace (-> libs meta :trace)
 
@@ -131,18 +118,11 @@
                        (ext/manifest-file lib coord (:deps/manifest mf) basis)))
                    (remove nil?)
                    seq)]
-    (when (and (-> argmap :main-opts seq) repl-aliases)
+    (when (and (-> (:argmap basis) :main-opts seq) repl-aliases)
       (io/printerrln "WARNING: Use of :main-opts with -A is deprecated. Use -M instead."))
     (cond-> {:basis basis}
       trace (assoc :trace trace)
       manifests (assoc :manifests manifests))))
-
-(defn read-deps
-  [name]
-  (when (not (str/blank? name))
-    (let [f (#?(:clj jio/file :cljr cio/file-info) name)]
-      (when (#?(:clj .exists  :cljr .Exists) f)
-        (deps/slurp-deps f)))))
 
 (defn write-lines
   [lines file]
@@ -154,14 +134,10 @@
 
 (defn run
   "Run make-classpath script. See -main for details."
-  [{:keys [install-dir config-user config-project cp-file jvm-file main-file basis-file manifest-file skip-cp trace tree] :as opts}]
-
-  (reset! clojure.tools.deps/install-dir install-dir)
-
-  (let [opts' (merge opts {:install-deps (deps/root-deps)
-                           :user-deps (read-deps config-user)
-                           :project-deps (or (read-deps "deps-clr.edn") (read-deps config-project))
-                           :tool-resolver resolve-tool-args})
+  [{:keys [cp-file jvm-file main-file basis-file manifest-file skip-cp tool-mode tool-name tool-aliases trace tree] :as opts}]
+  (let [opts' (cond-> opts
+                (and tool-mode (not tool-aliases))
+                (assoc :tool-data (when tool-name (resolve-tool-args tool-name))))
         {:keys [basis manifests], trace-log :trace} (run-core opts')
         {:keys [argmap libs classpath-roots]} basis
         {:keys [jvm-opts main-opts]} argmap]

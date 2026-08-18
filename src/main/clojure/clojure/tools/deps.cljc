@@ -797,8 +797,9 @@
   (-> (make-classpath-map {:paths paths} lib-map classpath-args) :classpath-roots join-classpath))
 
 (defn tool
-  "Transform project edn for tool by applying tool args (keys = :paths, :deps) and
-  returning an updated project edn."
+  "Replaces project-edn :deps and :paths with tool :deps and :paths
+  and returns a new project-edn map.
+  (Also supports :replace-deps and :replace-paths as aliases.)"
   [project-edn tool-args]
   (let [{:keys [replace-deps replace-paths deps paths]} tool-args]
     (cond-> project-edn
@@ -901,8 +902,7 @@
                      (dir/with-dir root-dir
                        (let [basis (create-basis
                                     {:project :standard ;; deps.edn at root
-                                     :extra {:aliases {:deps/TOOL {:replace-deps {} :replace-paths ["."]}}}
-                                     :aliases [:deps/TOOL alias]})
+                                     :args {:replace-deps {} :replace-paths ["."]}})
                              cp (join-classpath (:classpath-roots basis))
                              qual-f (qualify-fn f (get-in basis [:aliases alias]))
                              exit (exec-prep! root-dir cp qual-f exec-args)]
@@ -1018,8 +1018,9 @@
    Each dep source value can be :standard, a string path, a deps edn map, or nil.
    Sources are merged in the order - :root, :user, :project, :extra.
 
-   Aliases refer to argmaps in the merged deps that will be supplied to the basis
-   subprocesses (tool, resolve-deps, make-classpath-map).
+   When resolving deps and forming the classpath, different steps need various
+   args. These are pulled from the 'argmap' which is a merged set of args
+   selected by the aliases and optionally a map of args.
 
    Options:
      :dir     - directory root path, defaults to current directory   
@@ -1028,6 +1029,7 @@
      :project - dep source, default = :standard (\"deps.edn\")
      :extra   - dep source, default = nil
      :aliases - coll of aliases, default = nil
+     :args    - extra map of argmap args, merged after aliases
 
    The following subprocess argmap args can be provided:
      Key                  Subproc             Description
@@ -1045,13 +1047,9 @@
     :libs - lib map, per resolve-deps
     :classpath - classpath map per make-classpath-map
     :classpath-roots - vector of paths in classpath order"
-  [{:keys [dir root user project extra aliases] :as params}]
+  [{:keys [dir root user project extra aliases args] :as params}]
   (dir/with-dir #?(:clj (jio/file (or dir ".")) :cljr (cio/dir-info (or dir ".")))
-    (let [basis-config (cond-> nil
-                         (contains? params :root) (assoc :root root)
-                         (contains? params :project) (assoc :project project)
-                         (contains? params :user) (assoc :user user)
-                         (contains? params :extra) (assoc :extra extra)
+    (let [basis-config (cond-> (select-keys params [:root :project :user :extra :args])
                          (seq aliases) (assoc :aliases (vec aliases)))
 
           {root-edn :root user-edn :user project-edn :project extra-edn :extra} (create-edn-maps params)
@@ -1064,11 +1062,13 @@
           argmap-data (->> aliases
                            (remove nil?)
                            (map #(get alias-data %)))
-          argmap (apply merge-alias-maps argmap-data)
+          argmap (apply merge-alias-maps (conj argmap-data args))
   
           project-tooled-edn (tool project-edn argmap)
           merged-edn (merge-edns [root-edn user-edn project-tooled-edn extra-edn])
-          basis (calc-basis merged-edn {:resolve-args argmap, :classpath-args argmap})]
+          basis (if (:skip-cp argmap) ;; UNSUPPORTED, USE AT YOUR OWN RISK
+                  (assoc merged-edn :argmap argmap)
+                  (calc-basis merged-edn {:resolve-args argmap, :classpath-args argmap}))]
       (cond-> (assoc basis :basis-config basis-config)
         (pos? (count argmap)) (assoc :argmap argmap)))))
 
