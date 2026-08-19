@@ -249,9 +249,9 @@
         paths (filter #(get-in classpath [% :path-key]) classpath-roots)]
     ;; tool deps, not project deps
     (is (not (contains? libs 'cheshire/cheshire)))
-    #?(:clj  (is (= (map #(.getCanonicalPath (jio/file %)) ["." "x" "y"])
+    #?(:clj  (is (= (map #(.getCanonicalPath (jio/file %)) ["x" "y" "."])
                     (map #(.getCanonicalPath (jio/file %)) paths)))
-	   :cljr (is (= (map #(.FullName (cio/dir-info %)) ["." "x" "y"])                                ;;; return from dir-info can't be compared 
+	   :cljr (is (= (map #(.FullName (cio/dir-info %)) ["x" "y" "."])                                ;;; return from dir-info can't be compared 
                     (map #(.FullName (cio/dir-info %)) paths))))))
 
 #_(deftest config-data                                                                                              ;;; CLR can't deal with :mvn coords
