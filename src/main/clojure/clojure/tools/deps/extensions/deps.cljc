@@ -10,7 +10,7 @@
   clojure.tools.deps.extensions.deps
   (:require
     #?(:clj [clojure.java.io :as jio] :cljr [clojure.clr.io :as cio])
-    [clojure.tools.deps :as deps]
+    [clojure.tools.deps.edn :as depsedn]
     [clojure.tools.deps.extensions :as ext]
     [clojure.tools.deps.util.dir :as dir]
     [clojure.tools.deps.util.io :as io]
@@ -28,8 +28,8 @@
     (session/retrieve
       {:deps :map :file (.getAbsolutePath f)} ;; session key
       #(if (.exists f)
-         (deps/merge-edns [(deps/root-deps) (deps/slurp-deps f)])
-         (deps/root-deps)))))
+         (depsedn/merge-edns [(depsedn/root-deps) (depsedn/read-deps f)])
+         (depsedn/root-deps)))))
 
 :cljr
 ;; We can use "deps.edn" as the key in the session map -- we just need a consistent key.
@@ -42,11 +42,11 @@
       {:deps :map :file (.FullName f2)} ;; session key
       #(cond 
          (.Exists f1)
-         (deps/merge-edns [(deps/root-deps) (deps/slurp-deps f1)])
+         (depsedn/merge-edns [(depsedn/root-deps) (depsedn/read-deps f1)])
          (.Exists f2)
-         (deps/merge-edns [(deps/root-deps) (deps/slurp-deps f2)])
+         (depsedn/merge-edns [(depsedn/root-deps) (depsedn/read-deps f2)])
          :else
-         (deps/root-deps)))))
+         (depsedn/root-deps)))))
 )
 
 (defmethod ext/coord-deps :deps

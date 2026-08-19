@@ -268,5 +268,5 @@
 
 
 (comment
-  (clojure.test/run-tests)
-)
+  (config-data-file)
+  (clojure.test/run-tests))

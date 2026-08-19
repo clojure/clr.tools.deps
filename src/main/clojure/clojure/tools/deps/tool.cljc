@@ -11,7 +11,7 @@
     #?(:clj [clojure.java.io :as jio] :cljr [clojure.clr.io :as cio])
     [clojure.pprint :as pprint]
     [clojure.string :as str]
-    [clojure.tools.deps :as deps]
+    [clojure.tools.deps.edn :as depsedn]
     [clojure.tools.deps.extensions :as ext]
     [clojure.tools.deps.util.io :as io])
   (:import
@@ -21,12 +21,12 @@
 :clj 
 (defn- tool-dir
   ^File []
-  (jio/file (.getParentFile (jio/file (deps/user-deps-path))) "tools"))
+  (jio/file (.getParentFile (jio/file (depsedn/user-deps-path))) "tools"))
 
 :cljr
 (defn- tool-dir 
   ^DirectoryInfo []
-  (cio/dir-info (.Parent (cio/dir-info (deps/user-deps-path))) "tools"))
+  (cio/dir-info (.Parent (cio/dir-info (depsedn/user-deps-path))) "tools"))
 )
 
 #?(
@@ -47,8 +47,8 @@
 (defn install-tool
   "Procure the lib+coord, install the tool to the user tools dir (with lib, coord)"
   [lib coord as]
-  (let [{:keys [root-edn user-edn]} (deps/find-edn-maps)
-        master-edn (deps/merge-edns [root-edn user-edn])
+  (let [{:keys [root user]} (depsedn/create-edn-maps {:project nil})
+        master-edn (depsedn/merge-edns [root user])
         deps-info (ext/manifest-type lib coord master-edn)
         f (tool-file as)]
     ;; procure
@@ -79,8 +79,8 @@
   Throws ex-info if tool is unknown."
   [tool]
   (if-let [{:keys [lib coord]} (resolve-tool tool)]
-    (let [{:keys [root-edn user-edn]} (deps/find-edn-maps)
-          config (deps/merge-edns [root-edn user-edn])
+    (let [{:keys [root user]} (depsedn/create-edn-maps {:project nil})
+          config (depsedn/merge-edns [root user])
           [lib coord] (ext/canonicalize lib coord config)
           manifest-type (ext/manifest-type lib coord config)]
       (ext/coord-usage lib (merge coord manifest-type) (:deps/manifest manifest-type) config))
