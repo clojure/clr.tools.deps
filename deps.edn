@@ -1,5 +1,6 @@
-{:paths ["src/main/clojure"]
+{:paths ["src/main/clojure" "src/main/resources"]
  :deps {
+   io.github.clojure/clr.tools.deps.edn {:git/tag "v0.9.48" :git/sha "425bb0b"}
    io.github.clojure/clr.tools.gitlibs {:git/tag "v2.6.217" :git/sha "b5ddb68"}
    io.github.clojure/tools.cli {:git/tag "v1.2.245" :git/sha "3479990"}
  }
