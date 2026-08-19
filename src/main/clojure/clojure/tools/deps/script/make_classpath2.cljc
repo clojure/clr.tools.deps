@@ -87,6 +87,8 @@
            skip-cp threads trace tree] :as _opts}]
   (when (and main-aliases exec-aliases)
     (throw (ex-info "-M and -X cannot be used at the same time" {})))
+  (when (and (string? config-data) (not #?(:clj (.exists (jio/file config-data))  :cljr (.Exists (cio/file-info config-data)))))
+    (throw (ex-info (str "Extra deps file not found: " config-data) {})))	
   (let [combined-exec-aliases (concat main-aliases exec-aliases repl-aliases tool-aliases)
         args (cond-> nil
                threads (assoc :threads (#?(:clj Long/parseLong :cljr Int64/Parse) threads))
