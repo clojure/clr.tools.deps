@@ -51,6 +51,6 @@
   [s]
   (#'deps/canonicalize-all-syms  ;; to be removed in the future
     (cond
-      (str/blank? s) (throw (ex-info (str "-Sdeps must be non-blank") {}))
+      (str/blank? s) (throw (ex-info "-Sdeps must be non-blank" {}))
       (str/starts-with? (str/trim s) "{") (edn/read-string {:default tagged-literal} s)
       :else s)))
