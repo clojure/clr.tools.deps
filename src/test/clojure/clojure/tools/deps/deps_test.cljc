@@ -338,7 +338,21 @@
       (let [abasis (deps/create-basis {:user nil :dir adir})]
         (is (contains? (:classpath abasis) (.getAbsolutePath (jio/file bdir "src"))))))))
 		
-;; TODO -- translate this for CLJR someday
+:cljr
+(deftest test-local-root-relative-to-project-deps
+  (with-test-dir
+    (let [base *test-dir*
+          adeps (cio/file-info base "a/deps.edn")
+          bdeps (cio/file-info base "b/deps.edn")
+		  adir  (cio/dir-info base "a")
+		  bdir  (cio/dir-info base "b")]
+      (.Create (.Directory adeps))
+      (.Create (.Directory bdeps))
+      (spit adeps "{:deps {b/b {:local/root \"../b\"}}}")
+      (spit bdeps "{:paths [\"src\"]}")
+      (let [abasis (deps/create-basis {:user nil :dir adir})]
+        (is (contains? (:classpath abasis) (.FullName (cio/file-info bdir "src"))))))))
+
 
 )
 
@@ -352,6 +366,9 @@
              {:deps {'c/tda {:local/root "." :deps/manifest :pom}}
               :mvn/repos mvn/standard-repos}
              nil))))
+			 
+;; no equivalent for CLR -- no POM functionality			 
+			 
 )
 
 #?(
@@ -363,6 +380,25 @@
    :aliases {:test {:extra-paths ["test"]}}
    :mvn/repos {"central" {:url "https://repo1.maven.org/maven2/"}
                "clojars" {:url "https://repo.clojars.org/"}}})
+			   
+;; The difficulty with some of the tests that follow, specifically, those that use 'install-data',
+;; is that these pull from the maven coords and use some of the information from that pull.
+;; The CLR can't do that.
+
+;; I can translate to :git coordinates and pull in the info from there,
+;; but when we do (deps/calc-basis install-data), 
+;;  it wants to pull in :pom info and we can't do that either.
+
+;; So, instead, I'll try to pull in one of my libraries that has dependencies.
+
+:cljr
+
+(def install-data
+  {:paths ["src"]
+   :deps {'io.github.clojure/clr.test.generative {:git/tag "v1.1.2" :git/sha "97cd08c"}}
+   :aliases {:test {:extra-paths ["test"]}}})
+
+			   
 )
 
 #?(
@@ -382,6 +418,31 @@
                                     {:lib-name 'org.clojure/core.specs.alpha}
                                     {:path-key :paths}}))
     (is (contains? (set (keys classpath)) "src"))))
+	
+	
+:cljr
+
+(deftest calc-basis
+  (let [{:keys [libs classpath] :as basis} (deps/calc-basis install-data)]
+    ;; basis is superset of merged deps
+    (is (= install-data (select-keys basis (keys install-data))))
+
+    ;; lib map contains transitive deps
+    (is (= (set (keys libs)) 
+		  #{'io.github.clojure/clr.tools.reader 
+			'io.github.clojure/clr.test.generative 
+			'io.github.clojure/clr.data.generators 
+			'io.github.clojure/clr.tools.namespace}))
+
+    ;; classpath has all deps and src path
+    (is (= (set (vals classpath)) #{{:lib-name 'io.github.clojure/clr.data.generators}
+                                    {:lib-name 'io.github.clojure/clr.tools.namespace}
+									{:lib-name 'io.github.clojure/clr.test.generative}
+                                    {:lib-name 'io.github.clojure/clr.tools.reader}
+                                    {:path-key :paths}}))
+    (is (contains? (set (keys classpath)) "src"))))
+	
+	
 )
 
 (defn select-cp
@@ -398,6 +459,17 @@
     ;; libs has extra deps and transitive deps
     (is (< 4 (count expanded-deps)))
     (is (contains? expanded-deps 'org.clojure/tools.deps.alpha))))
+	
+:cljr 
+
+(deftest calc-basis-extra-deps
+  (let [ra {:extra-deps {'io.github.clojure/clr.data.json {:git/tag "v2.5.1" :git/sha "f84cb88"}}}
+        {:keys [libs]} (deps/calc-basis install-data {:resolve-args ra})
+        expanded-deps (-> libs keys set)]
+    ;; libs has extra deps and transitive deps
+    (is (< 4 (count expanded-deps)))
+    (is (contains? expanded-deps 'io.github.clojure/clr.data.json))))	
+	
 )
 
 #?(
@@ -408,11 +480,17 @@
         {:keys [libs]} (deps/calc-basis install-data {:resolve-args ra})]
     ;; libs has extra deps and transitive deps
     (is (= (get-in libs ['org.clojure/clojure :mvn/version]) "1.6.0"))))
+	
+:cljr
+
+(deftest calc-basis-override-deps
+  (let [ra {:extra-deps {'io.github.clojure/clr.test.generative {:git/tag "v1.1.1" :git/sha "2ae7773"}}}
+        {:keys [libs]} (deps/calc-basis install-data {:resolve-args ra})]
+    ;; libs has extra deps and transitive deps
+    (is (= (get-in libs ['io.github.clojure/clr.test.generative :git/tag]) "v1.1.1"))))
 
 )
 
-#?(
-:clj 
 
 (deftest calc-basis-extra-paths
   (let [cpa {:extra-paths ["x" "y"]}
@@ -420,7 +498,7 @@
     ;; classpath has extra paths
     (is (= {"src" {:path-key :paths}, "x" {:path-key :extra-paths}, "y" {:path-key :extra-paths}}
           (select-cp classpath :path-key)))))
-)
+
 
 #?(
 :clj
@@ -430,6 +508,15 @@
         {:keys [classpath]} (deps/calc-basis install-data {:classpath-args cpa})]
     ;; classpath has replaced path
     (is (= (get classpath "foo") {:lib-name 'org.clojure/clojure}))))
+	
+:cljr
+	
+(deftest calc-basis-classpath-overrides
+  (let [cpa {:classpath-overrides {'io.github.clojure/clr.test.generative "foo"}}
+        {:keys [classpath]} (deps/calc-basis install-data {:classpath-args cpa})]
+    ;; classpath has replaced path
+    (is (= (get classpath "foo") {:lib-name 'io.github.clojure/clr.test.generative}))))
+	
 )
 
 #?(
@@ -443,6 +530,18 @@
 
     ;; libs contains optional dep
     (is (= (get-in libs ['org.clojure/core.async :mvn/version]) "1.1.587"))))
+	
+:cljr 
+
+(deftest optional-deps-included
+  (let [master-edn (merge install-data
+                     '{:deps {io.github.clojure/clr.test.generative {:git/tag "v1.1.2" :git/sha "97cd08c"}
+                              io.github.clojure/clr.core.async {:git/tag "v1.7.701" :git/sha "07c6c8a" :optional true}}})
+        {:keys [libs]} (deps/calc-basis master-edn)]
+
+    ;; libs contains optional dep
+    (is (= (get-in libs ['io.github.clojure/clr.core.async :git/tag]) "v1.7.701"))))	
+	
 )
 
 #?(
@@ -507,6 +606,56 @@
       (is (false? (boolean (pred 'c))))
       ;;(is (true? (boolean (pred 'd))))
       )))
+	  
+:cljr
+
+(deftest test-update-excl
+  ;; new lib/version, no exclusions
+  (let [ret (#'deps/update-excl 'a {:git/tag "v1"} {:git/tag "v1"} '[b a] true :new-version nil nil)]
+    (is (= {:exclusions' nil, :cut' nil}
+          (select-keys ret [:exclusions' :cut'])))
+    (is (not (nil? (:child-pred ret))))
+  
+  ;; new lib/version, with exclusions 
+  (let [ret (#'deps/update-excl 'a {:git/tag "v1" :exclusions ['c]} {:git/tag "v1"} '[b a] true :new-version nil nil)]
+    (is (= {:exclusions' '{[b a] #{c}}, :cut' '{[a {:git/tag "v1"}] #{c}}}
+          (select-keys ret [:exclusions' :cut'])))
+    (is (not (nil? (:child-pred ret)))))
+
+  ;; same lib/version, fewer excludes
+  ;; a (excl c)
+  ;; b -> a -> c1
+  (let [excl '{[a] #{c}}
+        ret (#'deps/update-excl 'a {:git/tag "v1"} {:git/tag "v1"} '[b a] false :same-version
+              excl '{[a {:git/tag "v1"}] #{c}})]
+    (is (= {:exclusions' excl, :cut' '{[a #:git{:tag "v1"}] nil}} (select-keys ret [:exclusions' :cut']))) ;; remove cut
+    (let [pred (:child-pred ret)]
+      (is (true? (boolean (pred 'c))))))
+	)
+
+  ;; same lib/version, same excludes
+  ;; a (excl c)
+  ;; b -> a (excl c)
+  (let [excl '{[a] #{c}}
+        cut '{[a {:git/tag "v1"}] #{c}}
+        ret (#'deps/update-excl 'a {:git/tag "v1" :exclusions ['c]} {:git/tag "v1"} '[b a] false :same-version excl cut)]
+    (is (= {:exclusions' (assoc excl '[b a] '#{c}), :cut' cut} (select-keys ret [:exclusions' :cut']))) ;; no change in cut
+    (let [pred (:child-pred ret)]
+      (is (false? (boolean (pred 'c))))))
+
+  ;; same lib/version, more excludes
+  ;; a (excl c)
+  ;; b -> a (excl c, d)
+  (let [excl '{[a] #{c}}
+        cut '{[a {:git/tag "v1"}] #{c}}
+        ret (#'deps/update-excl 'a '{:git/tag "v1" :exclusions [c d]} {:git/tag "v1"} '[b a] false :same-version excl cut)]
+    (is (= {:exclusions' '{[a] #{c}, [b a] #{c d}}, :cut' cut} (select-keys ret [:exclusions' :cut']))) ;; no change in cut
+    (let [pred (:child-pred ret)] ;; c excluded in both, but re-enqueue d - always intersection
+      (is (false? (boolean (pred 'c))))
+      (is (false? (boolean (pred 'c))))
+      ;;(is (true? (boolean (pred 'd))))
+      )))
+	  
 )
 
 ;; +x1 -> -a1 -> +b2
@@ -602,6 +751,18 @@
       '{org.clojure/tools.cli {:mvn/version "1.0.214"}}
       '{io.github.clojure/tools.deps.graph {:git/tag "v1.1.76" :git/sha "6c58e98"}}
       '{org.clojure/tools.deps {:local/root "."}})))
+	  
+:cljr
+
+
+(deftest test-resolved-added-libs
+  (let [basis (deps/create-basis {:user nil :project nil})
+        libs (:libs basis)]
+    (are [add] (contains? (:added (deps/resolve-added-libs {:existing libs, :procurer basis, :add add}))
+                          (key (first add)))
+      '{io.github.clojure/clr.core.specs.alpha {:git/tag "v0.4.74"  :git/sha "e53b34f"}}
+      '{org.clojure/tools.deps {:local/root "."}})))
+
 )
 
 #?(
