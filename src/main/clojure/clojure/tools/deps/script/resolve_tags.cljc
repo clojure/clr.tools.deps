@@ -8,6 +8,9 @@
 
 (ns ^{:skip-wiki true}
   clojure.tools.deps.script.resolve-tags
+  "Implements the Clojure CLI tag resolver.
+  IMPL namespace, subject to change without warning.
+  Likely to move to CLI code base in the future."  
   (:require
     #?(:clj [clojure.java.io :as jio]
 	   :cljr [clojure.clr.io :as cio])
