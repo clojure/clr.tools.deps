@@ -12,7 +12,6 @@
     #?(:clj [clojure.java.io :as jio] :cljr [clojure.clr.io :as cio])
     [clojure.string :as str]
     [clojure.edn :as edn]
-    [clojure.tools.deps :as deps]
     [clojure.tools.deps.edn :as depsedn])
   (:import
     #?(:clj [java.io File] :cljr [System.IO FileInfo])))
