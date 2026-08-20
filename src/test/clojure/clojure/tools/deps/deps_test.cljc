@@ -4,6 +4,7 @@
 	   :cljr [clojure.clr.io :as cio])
     [clojure.test :refer [deftest is are testing]]
     [clojure.tools.deps :as deps]
+    [clojure.tools.deps.edn :as depsedn]
     [clojure.tools.deps.util :as util]
     [clojure.tools.deps.extensions :as ext]
     [clojure.tools.deps.extensions.faken :as fkn]
@@ -11,8 +12,42 @@
     #?(:clj [clojure.tools.deps.util.maven :as mvn]))
   (:import
     #?(:clj [java.io File]
-	   :cljr [System.IO FileInfo DirectoryInfo])))
+	   :cljr [System.IO FileInfo DirectoryInfo File Path])))
 
+
+;; The :clj code creates the temp file and returns a File.
+;; For :cljr, there is no single call that does that.  File/Create returns a FileStream.  
+;; So we close it and create a FileInfo with the proper reference.
+;; Also, because we need to control the file extension, we have to create our own name via a Guid.
+
+(defn create-temp-file
+  [^String prefix ^String extension]
+  #?(:clj  (File/createTempFile prefix extension)
+     :cljr (let [filename (Path/Combine (Path/GetTempPath) (Path/ChangeExtension (String/Concat prefix (.ToString (Guid/NewGuid) "N")) ".edn"))]
+	          (doto (File/Create filename) (.Close))
+			  (FileInfo. filename))))
+
+(deftest test-find-edn-maps
+  (let [edn-maps (deps/find-edn-maps)]
+    (is (util/submap?
+          {:root-edn (depsedn/root-deps)
+           :user-edn (depsedn/user-deps)
+           :project-edn {:paths ["src/main/clojure" "src/main/resources"]
+                         :deps {}}}
+          edn-maps)))
+
+  (let [deps-file (create-temp-file "tmp" ".edn") 
+        tmp-dir #?(:clj (.getParentFile deps-file) :cljr (Path/GetTempPath))
+        deps {:paths ["x"]}]
+    (spit deps-file deps)
+    (dir/with-dir tmp-dir
+      (let [edn-maps (deps/find-edn-maps #?(:clj (.getCanonicalPath deps-file) :cljr (.FullName deps-file)))]
+        (is (util/submap?
+              {:root-edn (depsedn/root-deps)
+               :user-edn (depsedn/user-deps)
+               :project-edn {:paths ["x"]}}
+              edn-maps))))))
+			  
 (def repo
   ;; "real"
   {'org.clojure/clojure {{:fkn/version "1.9.0"}
