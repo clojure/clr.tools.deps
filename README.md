@@ -15,7 +15,7 @@ Latest release: 0.31.1642
 deps.edn dependency information:
 
 ```clojure
- io.github.clojure/clr.tools.deps {:git/tag "v0.1.8" :git/sha "1cb01c7"}
+ io.github.clojure/clr.tools.deps {:git/tag "v0.31.1642" :git/sha "ce821f4"}
 ```
 
 ## Copyright and License
