@@ -10,7 +10,7 @@ Please see the parent repo for documentation.
 
 
 
-Latest release: 0.31.1642
+Latest release: 0.31.164XXXXX
 
 deps.edn dependency information:
 
