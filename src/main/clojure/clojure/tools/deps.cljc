@@ -693,21 +693,22 @@
   [^DirectoryInfo dir classpath f args]
   ;; clojure.main  clojure.main -e '(do (if-let [resolved-f (requiring-resolve 'f)] (resolved-f nil) (System/exit 1)) nil)'
   ;; with CLOJURE_LOAD_PATH set to classpath
-  (let [command "clojure.main"
-        command-args ["-e" 
-	               (str "(do (if-let [resolved-f (requiring-resolve '"
+  (let [eval-form (str "(do (if-let [resolved-f (requiring-resolve '"
                           f
                           ")] (resolved-f "
                            (pr-str args)
-                           ") (Environment/Exit 1)) nil)")]
-	    proc-builder (doto (ProcessStartInfo. command (clojure.string/join " " command-args))
-		                (.set_RedirectStandardError true)
+                           ") (Environment/Exit 1)) nil)")
+        command-args (into-array String ["-e" eval-form])
+        user-profile (Environment/GetFolderPath Environment+SpecialFolder/UserProfile)
+        shim (Path/Combine user-profile ".dotnet" "tools" "clojure.main.exe")
+	    proc-builder (doto (ProcessStartInfo. shim ^String/1 command-args)
+						(.set_RedirectStandardError true)
 			            (.set_RedirectStandardOutput true)
-						(.set_WorkingDirectory dir)
+						(.set_WorkingDirectory (.FullName dir))
                         (.set_UseShellExecute false))
-		_ (.Add (.EnvironmentVariables proc-builder) "CLOJURE_LOAD_PATH" classpath)
+		_ (.set_Item (.EnvironmentVariables proc-builder)"CLOJURE_LOAD_PATH" classpath)		
         proc (Process/Start proc-builder)]
-	  (.WaitForExit proc)
+	   (.WaitForExit proc)
 	  (.ExitCode proc)))
 
 )
@@ -727,18 +728,18 @@
               :info  - print only when prepping
               :debug - :info + print for each lib considered"
   [lib-map {:keys [action current log] :or {current false}} config]
-  (let [local-dir (#?(:clj .getAbsolutePath :cljr .FullName)(dir/canonicalize (#?(:clj jio/file :cljr cio/file-info) ".")))
+  (let [local-dir (#?(:clj .getAbsolutePath :cljr .FullName)(dir/canonicalize (#?(:clj jio/file :cljr cio/dir-info) ".")))
         unprepped
         (reduce-kv
          (fn [ret lib {:deps/keys [root manifest] :as coord}]
            (if-let [{f :fn, :keys [alias ensure exec-args]} (ext/prep-command lib coord manifest config)]
-             (let [ensure-dir (when ensure (#?(:clj jio/file :cljr cio/file-info)root ensure))
-                   unprepped (and ensure (not (#?(:clj .exists :cljr .Exists) ^#?(:clj File  :cljr FileInfo) ensure-dir)))]
+             (let [ensure-dir (when ensure (#?(:clj jio/file :cljr cio/dir-info)root ensure))
+                   unprepped (and ensure (not (#?(:clj .exists :cljr .Exists) ^#?(:clj File  :cljr DirectoryInfo) ensure-dir)))]
                (when (#{:debug} log) (println lib "-" (if unprepped "unprepped" "prepped")))
                (if (or (= action :force) (and unprepped (= action :prep)))
                  (do
                    (when (#{:info :debug} log) (println "Prepping" lib "in" root))
-                   (let [root-dir (#?(:clj jio/file :cljr cio/file-info) root)]
+                   (let [root-dir (#?(:clj jio/file :cljr cio/dir-info) root)]
                      (dir/with-dir root-dir
                        (let [basis (create-basis
                                     {:project :standard ;; deps.edn at root
