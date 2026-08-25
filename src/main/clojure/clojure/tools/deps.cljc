@@ -37,7 +37,7 @@
   (assembly-load-from (str clojure.lang.RT/SystemRuntimeDirectory "System.Diagnostics.Process.dll"))
   (catch Exception e))  ;; failing silently okay -- if we need it and didn't find it, a type reference will fail later
 
-(import '[System.Diagnostics Process ProcessStartInfo])
+(import '[System.Diagnostics Process ProcessStartInfo DataReceivedEventHandler])
 
 (set! *warn-on-reflection* true)
 
@@ -368,7 +368,7 @@
                 (children-task [lib use-coord use-path child-pred]
                   {:pend-children
                    (let [{:deps/keys [manifest root]} use-coord]
-                     (dir/with-dir (if root (cio/dir-info root) dir/*the-dir*)
+                     (dir/with-dir (or root dir/*the-dir*)                                          ;;; Do not call cio/file-infow with dir/with-dir -- it calls canonicalize
                        (concurrent/submit-task tf
                          #(try
 					        (let [k [lib use-coord]
@@ -693,7 +693,7 @@
   [^DirectoryInfo dir classpath f args]
   ;; clojure.main  clojure.main -e '(do (if-let [resolved-f (requiring-resolve 'f)] (resolved-f nil) (System/exit 1)) nil)'
   ;; with CLOJURE_LOAD_PATH set to classpath
-  (let [eval-form (str "(do (if-let [resolved-f (requiring-resolve '"
+   (let [eval-form (str "(do (if-let [resolved-f (requiring-resolve '"
                           f
                           ")] (resolved-f "
                            (pr-str args)
@@ -701,15 +701,33 @@
         command-args (into-array String ["-e" eval-form])
         user-profile (Environment/GetFolderPath Environment+SpecialFolder/UserProfile)
         shim (Path/Combine user-profile ".dotnet" "tools" "clojure.main.exe")
-	    proc-builder (doto (ProcessStartInfo. shim ^String/1 command-args)
+	    psi (doto (ProcessStartInfo. shim ^String/1 command-args)
 						(.set_RedirectStandardError true)
 			            (.set_RedirectStandardOutput true)
 						(.set_WorkingDirectory (.FullName dir))
                         (.set_UseShellExecute false))
-		_ (.set_Item (.EnvironmentVariables proc-builder)"CLOJURE_LOAD_PATH" classpath)		
-        proc (Process/Start proc-builder)]
-	   (.WaitForExit proc)
-	  (.ExitCode proc)))
+		_ (.set_Item (.EnvironmentVariables psi)"CLOJURE_LOAD_PATH" classpath)		
+        proc (doto (Process.)
+		       (.set_StartInfo psi)
+
+               ;;;; stdout
+               ;;(.add_OutputDataReceived 
+               ;;  (gen-delegate DataReceivedEventHandler [sender e]
+               ;;    (when-let [line (.Data e)]
+               ;;      (println "[stdout]" line))))
+
+               ;;;; stderr
+               ;;(.add_ErrorDataReceived proc
+               ;;  (gen-delegate DataReceivedEventHandler [sender e]
+               ;;   (when-let [line (.Data e)]
+               ;;     (println "[stderr]" line))))
+			   )]
+			   
+    (.Start proc)
+    ;;(.BeginOutputReadLine )
+    ;;(.BeginErrorReadLine )
+    (.WaitForExit proc)
+	(.ExitCode proc)))
 
 )
 
@@ -728,18 +746,18 @@
               :info  - print only when prepping
               :debug - :info + print for each lib considered"
   [lib-map {:keys [action current log] :or {current false}} config]
-  (let [local-dir (#?(:clj .getAbsolutePath :cljr .FullName)(dir/canonicalize (#?(:clj jio/file :cljr cio/dir-info) ".")))
+  (let [local-dir (#?(:clj .getAbsolutePath :cljr .FullName)(dir/canonicalize (#?(:clj jio/file :cljr identity) ".")))  ;;; CLR: For dir/canonicalize to work, pass it a string
         unprepped
         (reduce-kv
          (fn [ret lib {:deps/keys [root manifest] :as coord}]
            (if-let [{f :fn, :keys [alias ensure exec-args]} (ext/prep-command lib coord manifest config)]
-             (let [ensure-dir (when ensure (#?(:clj jio/file :cljr cio/dir-info)root ensure))
+             (let [ensure-dir (when ensure (#?(:clj jio/file :cljr cio/dir-info) root ensure))
                    unprepped (and ensure (not (#?(:clj .exists :cljr .Exists) ^#?(:clj File  :cljr DirectoryInfo) ensure-dir)))]
                (when (#{:debug} log) (println lib "-" (if unprepped "unprepped" "prepped")))
                (if (or (= action :force) (and unprepped (= action :prep)))
                  (do
                    (when (#{:info :debug} log) (println "Prepping" lib "in" root))
-                   (let [root-dir (#?(:clj jio/file :cljr cio/dir-info) root)]
+                   (let [root-dir (#?(:clj jio/file :cljr identity) root)]             ;;; Will be passed to dir/with-dir, which will canonicalize -- do not pass a cio/file-info.
                      (dir/with-dir root-dir
                        (let [basis (create-basis
                                     {:project :standard ;; deps.edn at root
@@ -747,7 +765,7 @@
                                      :aliases [alias]})
                              cp (join-classpath (:classpath-roots basis))
                              qual-f (qualify-fn f (get-in basis [:aliases alias]))
-                             exit (exec-prep! root-dir cp qual-f exec-args)]
+                             exit (exec-prep! dir/*the-dir* cp qual-f exec-args)]
                          (cond
                            (zero? exit) ret
                            (= exit 1) (throw (ex-info (format "Prep function could not be resolved: %s" qual-f) {:lib lib}))
@@ -833,7 +851,7 @@
     :classpath - classpath map per make-classpath-map
     :classpath-roots - vector of paths in classpath order"
   [{:keys [dir root user project extra aliases args] :as params}]
-  (dir/with-dir #?(:clj (jio/file (or dir ".")) :cljr (cio/dir-info (or dir ".")))
+  (dir/with-dir #?(:clj (jio/file (or dir ".")) :cljr (or dir "."))                        ;;; do not call cio/file-info -- dir/with-dir will canonicalize the string
     (let [basis-config (cond-> (select-keys params [:root :project :user :extra :args])
                          (seq aliases) (assoc :aliases (vec aliases)))
 

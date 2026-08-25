@@ -51,12 +51,12 @@
 
 (defmethod ext/coord-deps :deps
   [_lib {:keys [deps/root] :as _coord} _mf config]
-  (dir/with-dir (#?(:clj jio/file :cljr cio/file-info) root)
+  (dir/with-dir (#?(:clj jio/file :cljr identity) root)
     (seq (:deps (deps-map config root)))))
 
 (defmethod ext/coord-paths :deps
   [_lib {:keys [deps/root] :as _coord} _mf config]
-  (dir/with-dir (#?(:clj jio/file :cljr cio/file-info) root)
+  (dir/with-dir (#?(:clj jio/file :cljr identity) root)
     (->> (:paths (deps-map config root))
       (map #(dir/canonicalize (#?(:clj jio/file :cljr identity) %)))
       (map #(do
@@ -87,11 +87,11 @@
 )
 
 (defmethod ext/coord-usage :deps [lib {:keys [deps/root] :as _coord} manifest-type config]
-  (dir/with-dir (#?(:clj jio/file :cljr cio/file-info) root)
+  (dir/with-dir (#?(:clj jio/file :cljr identity) root)
     (:tools/usage (deps-map config root))))
 
 (defmethod ext/prep-command :deps [lib {:keys [deps/root] :as _coord} manifest-type config]
-  (dir/with-dir (#?(:clj jio/file :cljr cio/file-info) root)
+  (dir/with-dir (#?(:clj jio/file :cljr identity) root)
     (let [external-deps (deps-map config root)]
       (when-let [prep-info (:deps/prep-lib external-deps)]
         (let [exec-args (-> external-deps :aliases (get (:alias prep-info)) :exec-args)]
