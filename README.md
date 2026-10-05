@@ -10,12 +10,12 @@ Please see the parent repo for documentation.
 
 
 
-Latest release: 0.31.1645
+Latest release: 0.31.1646
 
 deps.edn dependency information:
 
 ```clojure
- io.github.clojure/clr.tools.deps {:git/tag "v0.31.1645" :git/sha "ac3c0d6"}
+ io.github.clojure/clr.tools.deps {:git/tag "v0.31.1646" :git/sha "f664fee"}
 ```
 
 ## Copyright and License
