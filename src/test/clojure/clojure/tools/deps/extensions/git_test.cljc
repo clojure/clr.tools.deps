@@ -12,7 +12,8 @@
     [clojure.tools.deps.extensions :as ext]
     [clojure.tools.deps.extensions.git :as git])
   (:import
-    [clojure.lang ExceptionInfo]))
+    [clojure.lang ExceptionInfo]
+	[System.IO Path]))
 
 (deftest auto-git-url
   (are [url lib] (= url (git/auto-git-url lib))
@@ -81,6 +82,26 @@
   (is (thrown-with-msg? ExceptionInfo #"Library io.github.clojure/tools.deps has invalid tag"
         (ext/canonicalize 'io.github.clojure/tools.deps {:git/tag "9bf5778" :git/sha "9bf5778"} {})))
   )
+  
+#?(
+:cljr
+
+(deftest test-sha-dir-combine
+  (let [ab (Path/Join "a" "b")
+        a.b (Path/Join "a" ".." "b")
+		ab-slash (Path/Join "a" "b" (str Path/DirectorySeparatorChar))
+		ab-alt-slash (Path/Join "a" "b" (str Path/AltDirectorySeparatorChar))
+		rooted-ab (Path/GetFullPath (Path/Combine "a" "b"))
+		rooted-git-dir (Path/GetFullPath "git-dir")]
+	
+   (are [x y] (= x y)
+     (Path/Combine rooted-git-dir ab)  (git/combine-sha-dir rooted-git-dir ab)
+	 (Path/Combine rooted-git-dir ab)  (git/combine-sha-dir rooted-git-dir ab-slash)
+	 (Path/Combine rooted-git-dir ab)  (git/combine-sha-dir rooted-git-dir ab-alt-slash)
+	 (Path/Combine rooted-git-dir "b")  (git/combine-sha-dir rooted-git-dir a.b)
+	 rooted-ab  (git/combine-sha-dir rooted-git-dir rooted-ab))))
+  
+)
 
 (comment
   (canonicalize)

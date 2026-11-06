@@ -96,6 +96,54 @@
   [lib coord config]
   (let [[_lib {:git/keys [url sha]}] (to-canonical lib coord config)]
     {:git/url url, :git/sha sha}))
+	
+	
+;; Eventually, when we get it committed, this will be in   clojure.tools.deps.util.dir  (which is in library clr.tools.deps.edn)
+
+#?(
+:cljr
+
+(compile-when (>= (:major dotnet-version) 5)
+
+(defn trim-ending-directory-separator [^String s]
+  (System.IO.Path/TrimEndingDirectorySeparator s))
+  
+) ;; compile-when
+)
+
+
+#?(
+:cljr
+
+(compile-when (< (:major dotnet-version) 5)
+
+(defn directory-separator-char? [c]
+ (or (= System.IO.Path/DirectorySeparatorChar c)
+	 (= System.IO.Path/AltDirectorySeparatorChar c)))
+
+
+(defn trim-ending-directory-separator [^String s]
+  (cond
+     (String/IsNullOrWhiteSpace s)  
+	 s
+     (= (System.IO.Path/GetPathRoot s) s) 
+	 s
+     (directory-separator-char? (last s)) 
+	 (String/.Substring s 0 (dec (String/.Length s)))
+	 :else 
+	 s))
+  
+) ;; compile-when
+)
+
+#?(
+:cljr
+
+(defn combine-sha-dir [^String sha-dir ^String root]
+  (trim-ending-directory-separator (System.IO.Path/GetFullPath (System.IO.Path/Combine sha-dir root))))
+
+)
+	
 
 (defmethod ext/manifest-type :git
   [lib coord config]
@@ -109,10 +157,7 @@
                                    (if (.isAbsolute root-file) ;; should be only after coordinate resolution
                                      (.getCanonicalPath root-file)
                                      (.getCanonicalPath (jio/file sha-dir root-file))))
-							:cljr (let [root-file (cio/file-info root)]
-							        ;; there is no notion of absolute vs nonabsolute for FileInfo.
-									;; how do we make sure the sha-dir is in there?
-									(.FullName root-file)))
+							:cljr (combine-sha-dir sha-dir root))
                          sha-dir)]
           (if manifest
             {:deps/manifest manifest, :deps/root root-dir}
