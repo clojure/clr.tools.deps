@@ -739,6 +739,27 @@
                            :basis-config :project)))
   (is (= "foo/BOGUS.edn" (-> (deps/create-basis {:user nil :project "foo/BOGUS.edn"})
                        :basis-config :project))))
+					   
+#?(
+:cljr
+
+:a
+#_(deftest check-validate-path-passing-strings-via-testing-create-basis
+  (with-test-dir
+    (let [base *test-dir*
+          adeps (cio/file-info base "a/deps.edn")
+          bdeps (cio/file-info base "b/deps.edn")
+		  adir  (cio/dir-info base "a")
+		  bdir  (cio/dir-info base "b")]
+      (.Create (.Directory adeps))
+      (.Create (.Directory bdeps))
+      (spit adeps "{:deps {b/b {:local/root \"../b\"}}}")
+      (spit bdeps "{:paths [\"src\"]}")
+      (let [abasis (deps/create-basis {:user nil :dir adir})]
+        (is (contains? (:classpath abasis) (.FullName (cio/file-info bdir "src"))))))))
+
+)
+		   
 
 #?(
 :clj

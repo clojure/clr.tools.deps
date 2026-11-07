@@ -95,11 +95,11 @@
 		rooted-git-dir (Path/GetFullPath "git-dir")]
 	
    (are [x y] (= x y)
-     (Path/Combine rooted-git-dir ab)  (git/combine-sha-dir rooted-git-dir ab)
-	 (Path/Combine rooted-git-dir ab)  (git/combine-sha-dir rooted-git-dir ab-slash)
-	 (Path/Combine rooted-git-dir ab)  (git/combine-sha-dir rooted-git-dir ab-alt-slash)
-	 (Path/Combine rooted-git-dir "b")  (git/combine-sha-dir rooted-git-dir a.b)
-	 rooted-ab  (git/combine-sha-dir rooted-git-dir rooted-ab))))
+     (Path/Combine rooted-git-dir ab)  (git/resolve-against rooted-git-dir ab)
+	 (Path/Combine rooted-git-dir ab)  (git/resolve-against rooted-git-dir ab-slash)
+	 (Path/Combine rooted-git-dir ab)  (git/resolve-against rooted-git-dir ab-alt-slash)
+	 (Path/Combine rooted-git-dir "b")  (git/resolve-against rooted-git-dir a.b)
+	 rooted-ab  (git/resolve-against rooted-git-dir rooted-ab))))
   
 )
 
