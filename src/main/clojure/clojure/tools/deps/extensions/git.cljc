@@ -98,6 +98,7 @@
   (let [[_lib {:git/keys [url sha]}] (to-canonical lib coord config)]
     {:git/url url, :git/sha sha}))
 
+
 (defmethod ext/manifest-type :git
   [lib coord config]
   (let [[lib {:git/keys [url sha] :deps/keys [manifest root]}] (to-canonical lib coord config)]

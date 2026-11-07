@@ -753,7 +753,6 @@
 	  (is (= 0 (count (str sw))))
 	  (finally
 	     (System.IO.Directory/Delete tempdir)))))
-
 )
 		   
 

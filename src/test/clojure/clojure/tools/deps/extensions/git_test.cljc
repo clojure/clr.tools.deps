@@ -100,8 +100,7 @@
 	 (Path/Combine rooted-git-dir ab)  (dir/resolve-against rooted-git-dir ab-slash)
 	 (Path/Combine rooted-git-dir ab)  (dir/resolve-against rooted-git-dir ab-alt-slash)
 	 (Path/Combine rooted-git-dir "b")  (dir/resolve-against rooted-git-dir a.b)
-	 rooted-ab  (dir/resolve-against rooted-git-dir rooted-ab))))
-  
+	 rooted-ab  (dir/resolve-against rooted-git-dir rooted-ab))))  
 )
 
 (comment
