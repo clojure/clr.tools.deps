@@ -750,7 +750,7 @@
 	(try 
       (binding [*err* sw]
 	    (deps/create-basis {:dir tempdir :root nil :user nil :project {:paths ["src"]}}))
-	  (is (= 0 (count (str sw))))
+	  (is (= "" (str sw)))
 	  (finally
 	     (System.IO.Directory/Delete tempdir)))))
 )
