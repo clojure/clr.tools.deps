@@ -743,20 +743,16 @@
 #?(
 :cljr
 
-:a
-#_(deftest check-validate-path-passing-strings-via-testing-create-basis
-  (with-test-dir
-    (let [base *test-dir*
-          adeps (cio/file-info base "a/deps.edn")
-          bdeps (cio/file-info base "b/deps.edn")
-		  adir  (cio/dir-info base "a")
-		  bdir  (cio/dir-info base "b")]
-      (.Create (.Directory adeps))
-      (.Create (.Directory bdeps))
-      (spit adeps "{:deps {b/b {:local/root \"../b\"}}}")
-      (spit bdeps "{:paths [\"src\"]}")
-      (let [abasis (deps/create-basis {:user nil :dir adir})]
-        (is (contains? (:classpath abasis) (.FullName (cio/file-info bdir "src"))))))))
+(deftest check-validate-path-passing-strings-via-testing-create-basis
+  (let [sw (System.IO.StringWriter.)
+        tempdir (System.IO.Path/Combine (System.IO.Path/GetTempPath) (.ToString (Guid/NewGuid) "N"))]
+	(System.IO.Directory/CreateDirectory tempdir)
+	(try 
+      (binding [*err* sw]
+	    (deps/create-basis {:dir tempdir :root nil :user nil :project {:paths ["src"]}}))
+	  (is (= 0 (count (str sw))))
+	  (finally
+	     (System.IO.Directory/Delete tempdir)))))
 
 )
 		   
