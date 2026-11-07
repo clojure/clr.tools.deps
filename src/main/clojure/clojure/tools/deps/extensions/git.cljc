@@ -11,6 +11,7 @@
   (:require
     #?(:clj [clojure.java.io :as jio] :cljr [clojure.clr.io :as cio])
     [clojure.tools.deps.extensions :as ext]
+	[clojure.tools.deps.util.dir :as dir]
     [clojure.tools.gitlibs :as gitlibs]))
 
 (def ^:private git-services
@@ -96,54 +97,6 @@
   [lib coord config]
   (let [[_lib {:git/keys [url sha]}] (to-canonical lib coord config)]
     {:git/url url, :git/sha sha}))
-	
-	
-;; Eventually, when we get it committed, this will be in   clojure.tools.deps.util.dir  (which is in library clr.tools.deps.edn)
-
-#?(
-:cljr
-
-(compile-when (>= (:major dotnet-version) 5)
-
-(defn trim-ending-directory-separator [^String s]
-  (System.IO.Path/TrimEndingDirectorySeparator s))
-  
-) ;; compile-when
-)
-
-
-#?(
-:cljr
-
-(compile-when (< (:major dotnet-version) 5)
-
-(defn directory-separator-char? [c]
- (or (= System.IO.Path/DirectorySeparatorChar c)
-	 (= System.IO.Path/AltDirectorySeparatorChar c)))
-
-
-(defn trim-ending-directory-separator [^String s]
-  (cond
-     (String/IsNullOrWhiteSpace s)  
-	 s
-     (= (System.IO.Path/GetPathRoot s) s) 
-	 s
-     (directory-separator-char? (last s)) 
-	 (String/.Substring s 0 (dec (String/.Length s)))
-	 :else 
-	 s))
-  
-) ;; compile-when
-)
-
-#?(
-:cljr
-
-(defn resolve-against [^String sha-dir ^String root]
-  (trim-ending-directory-separator (System.IO.Path/GetFullPath (System.IO.Path/Combine sha-dir root))))
-
-)
-	
 
 (defmethod ext/manifest-type :git
   [lib coord config]
@@ -157,7 +110,7 @@
                                    (if (.isAbsolute root-file) ;; should be only after coordinate resolution
                                      (.getCanonicalPath root-file)
                                      (.getCanonicalPath (jio/file sha-dir root-file))))
-							:cljr (resolve-against sha-dir root))
+							:cljr (dir/resolve-against sha-dir root))
                          sha-dir)]
           (if manifest
             {:deps/manifest manifest, :deps/root root-dir}
