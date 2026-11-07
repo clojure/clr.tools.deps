@@ -548,12 +548,27 @@
   (let [aliases' (assoc aliases :paths paths :extra-paths extra-paths)]
     (into [] (comp (mapcat #(chase-key aliases' %)) (remove nil?)) [:extra-paths :paths])))
 
+#?(
+:clj
+
 (defn- validate-paths
   [paths]
   (doto paths
     (->> (map first)
-      (run! #(when (not (dir/sub-path? (#?(:clj jio/file :cljr cio/file-info) %)))
+      (run! #(when (not (dir/sub-path? (jio/file %)))
                (io/printerrln "WARNING: Use of :paths external to the project has been deprecated, please remove:" %))))))
+
+:cljr
+			   
+(defn- validate-paths
+  [paths]
+  (doto paths
+    (->> (map first)
+      (run! #(when (not (dir/sub-path? %))
+               (io/printerrln "WARNING: Use of :paths external to the project has been deprecated, please remove:" %))))))
+
+)			   
+			   
 
 (defn- tree-paths
   "Given a lib map, return a vector of all vector paths to included libs in the tree.

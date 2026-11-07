@@ -139,7 +139,7 @@
 #?(
 :cljr
 
-(defn combine-sha-dir [^String sha-dir ^String root]
+(defn resolve-against [^String sha-dir ^String root]
   (trim-ending-directory-separator (System.IO.Path/GetFullPath (System.IO.Path/Combine sha-dir root))))
 
 )
@@ -157,7 +157,7 @@
                                    (if (.isAbsolute root-file) ;; should be only after coordinate resolution
                                      (.getCanonicalPath root-file)
                                      (.getCanonicalPath (jio/file sha-dir root-file))))
-							:cljr (combine-sha-dir sha-dir root))
+							:cljr (resolve-against sha-dir root))
                          sha-dir)]
           (if manifest
             {:deps/manifest manifest, :deps/root root-dir}
