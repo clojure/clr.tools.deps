@@ -12,7 +12,7 @@
     #?(:clj [clojure.tools.deps.util.maven :as mvn]))
   (:import
     #?(:clj [java.io File]
-	   :cljr [System.IO FileInfo DirectoryInfo File Path])))
+	   :cljr [System.IO FileInfo DirectoryInfo File Path Directory])))
 
 
 ;; The :clj code creates the temp file and returns a File.
@@ -785,6 +785,26 @@
 :clj
 (deftest test-find-all-versions
   (is (seq (ext/find-all-versions 'ragtime nil {:mvn/repos mvn/standard-repos}))))
+)
+
+
+#?(
+:cljr
+
+(deftest root+ensure-exists?-test
+  (let [tempdir (Path/Combine (Path/GetTempPath) (.ToString (Guid/NewGuid) "N"))
+        subdir (Path/Combine tempdir "subdir")
+        filepatha (Path/Combine subdir "a.txt")]
+    (Directory/CreateDirectory subdir)
+    (try
+      (File/WriteAllText filepatha "some content")
+      (is (#'deps/root+ensure-exists? tempdir "subdir"))
+      (is (#'deps/root+ensure-exists? subdir "a.txt"))
+      (is (not (#'deps/root+ensure-exists? subdir "b.txt")))
+      (finally
+        (Directory/Delete tempdir true)))))
+
+
 )
 
 (comment
