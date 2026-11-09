@@ -4,7 +4,7 @@
     [clojure.tools.deps.script.make-classpath2 :as mc]
     #?(:clj [clojure.java.io :as jio] :cljr [clojure.clr.io :as cio]))
   (:import
-    #?(:clj [java.io File] :cljr [System.IO File FileInfo Path])))
+    #?(:clj [java.io File] :cljr [System.IO File Directory FileInfo Path])))
 
 (defn submap?
   "Is m1 a subset of m2?"
@@ -277,6 +277,54 @@
                                  a [:m1 :m2]})]
       (is (= ["c"] (-> core-ret :basis :argmap :main-opts))))))
 
+
+#?(
+:cljr
+
+;; CLR frameworks in aliases are additive
+(deftest frameworks-add
+  (let [core-ret (mc/run-core {:config-user {:aliases {:j1 {:clr/frameworks ["A" "B"]}}}
+                               :config-project {:aliases {:j2 {:clr/frameworks ["C"]}}}
+                               :repl-aliases [:j1 :j2]})]
+    (is (= ["A" "B" "C"] (-> core-ret :basis :argmap :clr/frameworks))))
+
+  (let [core-ret (mc/run-core {:config-user {:aliases {:j1 {:clr/frameworks ["A" "B"]}}}
+                               :config-project {:aliases {:j2 {:clr/frameworks []}}}
+                               :repl-aliases [:j1 :j2]})]
+    (is (= ["A" "B"] (-> core-ret :basis :argmap :clr/frameworks))))
+
+  (let [core-ret (mc/run-core {:config-user {:aliases {:j1 {:clr/frameworks []}}}
+                               :config-project {:aliases {:j2 {:clr/frameworks ["C"]}}}
+                               :repl-aliases [:j1 :j2]})]
+    (is (= ["C"] (-> core-ret :basis :argmap :clr/frameworks))))
+
+  (let [core-ret (mc/run-core {:config-user {:aliases {:j1 {}}}
+                               :config-project {:aliases {:j2 {}}}
+                               :repl-aliases [:j1 :j2]})]
+    (is (nil? (-> core-ret :basis :argmap :clr/frameworks))))
+
+  (let [{:keys [basis]} (mc/run-core {:config-data {:aliases {:web {:clr/frameworks ["X"]}}}
+                                      :repl-aliases [:web]})]
+    (is (= ["X"] (:clr/frameworks (:argmap basis)))))
+
+  (let [{:keys [basis]} (mc/run-core {:config-project {:aliases {:j2 {:clr/frameworks ["C"]}}}
+                                      :config-data    {:aliases {:web {:clr/frameworks ["X"]}}}
+                                      :repl-aliases   [:j2 :web]})]
+    (is (= ["C" "X"] (:clr/frameworks (:argmap basis)))))
+
+  (let [temp-dir (Path/Combine (Path/GetTempPath) (.ToString (Guid/NewGuid) "N"))
+        temp-file (Path/Combine temp-dir "fff")]
+    (Directory/CreateDirectory temp-dir)
+    (try
+      (mc/write-lines ["A" "B"] temp-file)
+      (is (= ["A" "B"] (seq (File/ReadAllLines temp-file))))
+
+      (mc/write-lines nil temp-file)
+      (is (not (File/Exists temp-file)))
+ 
+      (finally
+        (Directory/Delete temp-dir true)))))
+)
 
 #?(
 
