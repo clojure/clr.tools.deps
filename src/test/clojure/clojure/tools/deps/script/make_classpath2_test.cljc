@@ -1,6 +1,6 @@
 (ns clojure.tools.deps.script.make-classpath2-test
   (:require
-    [clojure.test :refer [deftest is]]
+    [clojure.test :refer [deftest is testing]]
     [clojure.tools.deps.script.make-classpath2 :as mc]
     #?(:clj [clojure.java.io :as jio] :cljr [clojure.clr.io :as cio]))
   (:import
@@ -587,6 +587,193 @@
                                       :config-data (.FullName temp-file)})]
     (is (contains? (:libs basis) 'io.github.clojure/clr.data.json))))
 
+
+)
+
+#?(
+:cljr
+(defmacro with-temp-dir [[temp-dir-var] & body]
+  `(let [~temp-dir-var (Path/Combine (Path/GetTempPath) (.ToString (Guid/NewGuid) "N")) ]
+      (Directory/CreateDirectory ~temp-dir-var)
+      (try
+         ~@body
+         
+         (finally 
+           (Directory/Delete ~temp-dir-var true)))))
+           
+)
+
+#?(
+:cljr
+
+(defn- out-files [dir]
+  ;; output paths that run writes -- all in a temp dir
+  {
+    :clojure-version-file (Path/Combine dir "cv")
+    :cp-file              (Path/Combine dir "cp")
+    :basis-file           (Path/Combine dir "basis")
+    :jvm-file             (Path/Combine dir "jvm")
+    :main-file            (Path/Combine dir "main")
+    :manifest-file        (Path/Combine dir "manifest")
+   })
+                
+)
+
+#?(
+:cljr
+(deftest clojure-versioning
+ (testing "two aliases" 
+   (with-temp-dir [temp-dir]
+      (mc/run (merge 
+                {:config-user    {:aliases {:a1 {:clr/clojure-version "1.12.3-alpha3"}}}
+                 :config-project {:clr/clojure-version "1.12.6" :aliases {:a2 {:clr/clojure-version "1.13.0-alpha8"}}}
+                 :repl-aliases   [:a1 :a2]}
+                (out-files temp-dir)))
+      (is (= ["1.13.0-alpha8" "alias :a2"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+  
+  (testing "two aliases, only the first sets a version" 
+   (with-temp-dir [temp-dir]
+      (mc/run (merge 
+                {:config-user    {:aliases {:a1 {:clr/clojure-version "1.12.3-alpha3"}}}
+                 :config-project {:clr/clojure-version "1.12.6" :aliases {:a2 {}}}
+                 :repl-aliases   [:a1 :a2]}
+                (out-files temp-dir)))
+      (is (= ["1.12.3-alpha3" "alias :a1"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+  
+      
+  (testing "top level" 
+   (with-temp-dir [temp-dir]
+      (mc/run (merge
+                {:config-user    {:aliases {:a1 {}}}
+                 :config-project {:clr/clojure-version "1.12.6" :aliases {:a2 {}}}
+                 :repl-aliases   [:a1 :a2]}
+                (out-files temp-dir)))
+      (is (= ["1.12.6" "top-level"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+      
+  (testing "-Sdeps" 
+   (with-temp-dir [temp-dir]
+      (mc/run (merge 
+                {:config-user    {}
+                 :config-project {}
+                 :config-data {:aliases {:a1 {:clr/clojure-version "1.12.6"}}}
+                 :repl-aliases [:a1]}
+                (out-files temp-dir)))
+      (is (= ["1.12.6" "alias :a1"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+
+  (testing "absent" 
+   (with-temp-dir [temp-dir]
+      ;; We want to sure that in the absence of a requested version, an existing version file is deleted
+      (File/WriteAllText (Path/Combine temp-dir "cv") "sentinel")
+      (mc/run (merge
+                {:config-user    {:aliases {:a1 {}}}
+                 :config-project {:aliases {:a2 {}}}
+                 :repl-aliases   [:a1 :a2]}
+                (out-files temp-dir)))
+      (is (not (File/Exists (Path/Combine temp-dir "cv"))))))
+
+  (testing "bad value" 
+   (with-temp-dir [temp-dir]
+     (is (thrown-with-msg? ExceptionInfo  #"Invalid :clr/clojure-version"
+           (mc/run (merge
+                     {:config-user    {:aliases {:a1 {}}}
+                      :config-project {:clr/clojure-version "1.12.6abcd" :aliases {:a2 {}}}
+                      :repl-aliases   [:a1 :a2]}
+                     (out-files temp-dir)))))
+      (is (not (File/Exists (Path/Combine temp-dir "cv"))))))
+
+ (testing "user config" 
+   (with-temp-dir [temp-dir]
+      (mc/run (merge
+                {:config-user    {:clr/clojure-version "1.12.3-alpha3"}
+                 :config-project {}
+                 :repl-aliases   []}
+                (out-files temp-dir)))
+      (is (= ["1.12.3-alpha3" "top-level"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+      
+ (testing "-Sdeps over project and user" 
+   (with-temp-dir [temp-dir]
+      (mc/run (merge
+                {:config-user    {:clr/clojure-version "1.12.6"}
+                 :config-project {:clr/clojure-version "1.12.5"}
+                 :config-data {:clr/clojure-version "1.12.4"}
+                 :repl-aliases   []}
+                (out-files temp-dir)))
+      (is (= ["1.12.4" "top-level"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+   
+ (testing "project over user" 
+   (with-temp-dir [temp-dir]
+      (mc/run (merge 
+                {:config-user    {:clr/clojure-version "1.12.6"}
+                 :config-project {:clr/clojure-version "1.12.5"}
+                 :repl-aliases   []}
+                (out-files temp-dir)))
+      (is (= ["1.12.5" "top-level"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+    
+  (testing ":replace-deps, version not specified" 
+    (with-temp-dir [temp-dir]
+      ;; We want to sure that in the absence of a requested version, an existing version file is deleted
+      (File/WriteAllText (Path/Combine temp-dir "cv") "sentinel")
+      (mc/run (merge
+                {:config-user    {}
+                 :config-project {:clr/clojure-version "1.12.6" :aliases {:r {:replace-deps {}}}}
+                 :repl-aliases   [:r]}
+                (out-files temp-dir)))
+      (is (not (File/Exists (Path/Combine temp-dir "cv"))))))
+      
+  (testing ":replace-deps, version specified" 
+    (with-temp-dir [temp-dir]
+      (mc/run (merge
+                {:config-user    {}
+                 :config-project {:clr/clojure-version "1.12.6" 
+                                  :aliases {:r {:replace-deps {}
+                                                :clr/clojure-version "1.12.5"}}}
+               :repl-aliases   [:r]}
+                (out-files temp-dir)))
+      (is (= ["1.12.5" "alias :r"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+          
+  (testing ":deps, version not specified" 
+    (with-temp-dir [temp-dir]
+      ;; We want to sure that in the absence of a requested version, an existing version file is deleted
+      (File/WriteAllText (Path/Combine temp-dir "cv") "sentinel")
+      (mc/run (merge 
+                {:config-user    {}
+                 :config-project {:clr/clojure-version "1.12.6" :aliases {:r {:deps {}}}}
+                 :repl-aliases   [:r]}
+                (out-files temp-dir)))
+      (is (not (File/Exists (Path/Combine temp-dir "cv"))))))
+      
+  (testing ":deps, version specified" 
+    (with-temp-dir [temp-dir]
+      (mc/run (merge 
+                {:config-user    {}
+                 :config-project {:clr/clojure-version "1.12.6" 
+                                  :aliases {:r {:deps {}
+                                                :clr/clojure-version "1.12.5"}}}
+                 :repl-aliases   [:r]}
+                (out-files temp-dir)))
+      (is (= ["1.12.5" "alias :r"] (File/ReadAllLines (Path/Combine temp-dir "cv"))))))
+  
+  (testing "tool mode, no version" 
+   (with-temp-dir [temp-dir]
+      ;; We want to sure that in the absence of a requested version, an existing version file is deleted
+      (File/WriteAllText (Path/Combine temp-dir "cv") "sentinel")
+      (mc/run (merge 
+                {:config-user    {}
+                 :config-project {:clr/clojure-version "1.12.6" :aliases {:t {}}}
+                 :tool-aliases   [:t]
+                 :tool-mode true}
+                (out-files temp-dir)))
+      (is (not (File/Exists (Path/Combine temp-dir "cv")))))) 
+      
+  (testing "tool mode, with version" 
+   (with-temp-dir [temp-dir]
+      (mc/run (merge
+                {:config-user    {}
+                 :config-project {:clr/clojure-version "1.12.6" :aliases {:t {:clr/clojure-version "1.12.5"}}}
+                 :tool-aliases   [:t]
+                 :tool-mode true}
+                (out-files temp-dir)))
+      (is (= ["1.12.5" "alias :t"] (File/ReadAllLines (Path/Combine temp-dir "cv")))))))
 
 )
 
